@@ -28,6 +28,7 @@ Requires: pam, tcp_wrappers
 %makeinstall
 %{__install} -Dp -m0644 tac_plus.sysconfig %{buildroot}etc/sysconfig/tac_plus
 %{__install} -Dp -m0644 tac_plus.service %{buildroot}usr/lib/systemd/system/tac_plus.service
+%{__install} -Dp -m0640 tacacs.xml %{buildroot}usr/lib/firewalld/services/tacacs.xml
 ### Clean up buildroot
 %{__rm} -f %{buildroot}%{_infodir}/dir
 
@@ -56,5 +57,5 @@ Requires: pam, tcp_wrappers
 %{_libdir}/libtacacs.la
 /etc/sysconfig/tac_plus
 /usr/lib/systemd/system/tac_plus.service
-
+/usr/lib/firewalld/services/tacacs.xml
 %changelog

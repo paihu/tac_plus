@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<service>
+    <short>tacacs+</short>
+    <description>Tacacs+ is the protocol used to AAA service for Network Device.</description
+    <port protocol="tcp" port="49"/>
+</service>
+
