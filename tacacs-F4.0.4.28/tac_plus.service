@@ -1,0 +1,13 @@
+[Unit]
+Description=tacacs+ Server
+After=network.target
+
+[Service]
+Type=forking
+EnvironmentFile=/etc/sysconfig/tac_plus
+ExecStart=/usr/local/sbin/tac_plus -C $CONFIG "${LOGFILE:+-l $LOGFILE}" "${WHOLOG:+-w $WHOLOG}" "${DEBUG_LEVEL:+-d $DEBUG_LEVEL}"
+PIDFile=/var/run/tac_plus.pid
+
+[Install]
+WantedBy=multi-user.target
+
