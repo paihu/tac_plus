@@ -143,10 +143,25 @@ verify(char *name, char *passwd, struct authen_data *data, int recurse)
      * has been issued, attempt to use this password file
      */
     if (cfg_passwd == NULL) {
-	char *file = cfg_get_authen_default();
-	if (file) {
-	    return(passwd_file_verify(name, passwd, data, file));
-	}
+	if (default_authen_type == TAC_PLUS_DEFAULT_AUTHEN_TYPE_FILE) {
+	    char *file = cfg_get_authen_default();
+	    if (file) {
+	        return(passwd_file_verify(name, passwd, data, file));
+	    }
+#if HAVE_PAM
+	} else if (default_authen_type == TAC_PLUS_DEFAULT_AUTHEN_TYPE_PAM) {
+	    /* try to verify the password via PAM */
+	    if (!pam_verify(name, passwd)) {
+	        data->status = TAC_PLUS_AUTHEN_STATUS_FAIL;
+	        return(0);
+	    } else
+		data->status = TAC_PLUS_AUTHEN_STATUS_PASS;
+
+	    exp_date = cfg_get_expires(name, recurse);
+	    set_expiration_status(exp_date, data);
+	    return(data->status == TAC_PLUS_AUTHEN_STATUS_PASS);
+#endif
+        }
 
 	/* otherwise, we fail */
 	data->status = TAC_PLUS_AUTHEN_STATUS_FAIL;

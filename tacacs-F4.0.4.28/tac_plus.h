@@ -217,6 +217,13 @@ extern struct timeval started_at;
 extern char *wtmpfile;
 extern int wtmpfd;
 
+/* extend default authentication */
+int default_authen_type;
+#define TAC_PLUS_DEFAULT_AUTHEN_TYPE_FILE  1
+#if HAVE_PAM
+#define TAC_PLUS_DEFAULT_AUTHEN_TYPE_PAM   2
+#endif
+
 #define HASH_TAB_SIZE 157        /* user and group hash table sizes */
 
 struct acct {
