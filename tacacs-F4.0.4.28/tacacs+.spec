@@ -1,5 +1,5 @@
 Summary: TACACS+ Daemon
-Name: tacacs+
+Name: tacacs
 Group: Networking/Servers
 Version: F4.0.4.28
 Release: 2.el7
@@ -26,9 +26,9 @@ Requires: pam, tcp_wrappers
 %install
 %{__rm} -rf %{buildroot}
 %makeinstall
-%{__install} -Dp -m0644 tac_plus.sysconfig %{buildroot}etc/sysconfig/tac_plus
-%{__install} -Dp -m0644 tac_plus.service %{buildroot}usr/lib/systemd/system/tac_plus.service
-%{__install} -Dp -m0640 tacacs.xml %{buildroot}usr/lib/firewalld/services/tacacs.xml
+%{__install} -Dp -m0644 tac_plus.sysconfig %{buildroot}/etc/sysconfig/tac_plus
+%{__install} -Dp -m0644 tac_plus.service %{buildroot}/usr/lib/systemd/system/tac_plus.service
+%{__install} -Dp -m0640 tacacs.xml %{buildroot}/usr/lib/firewalld/services/tacacs.xml
 ### Clean up buildroot
 %{__rm} -f %{buildroot}%{_infodir}/dir
 
@@ -43,10 +43,12 @@ Requires: pam, tcp_wrappers
 
 /usr/include/tacacs.h
 /usr/bin/tac_pwd
-/usr/bin/tac_plus
-/usr/share/tacacs+/users_guide
-/usr/share/tacacs+/tac_convert
-/usr/share/tacacs+/do_auth.py
+/usr/sbin/tac_plus
+/usr/share/tacacs/users_guide
+/usr/share/tacacs/tac_convert
+/usr/share/tacacs/do_auth.py
+/usr/share/tacacs/do_auth.pyc
+/usr/share/tacacs/do_auth.pyo
 /usr/share/man/man5/tac_plus.conf.5.gz
 /usr/share/man/man8/tac_pwd.8.gz
 /usr/share/man/man8/tac_plus.8.gz
