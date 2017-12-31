@@ -70,6 +70,7 @@ parser_init(void)
     declare("arap", S_arap);
     declare("attribute", S_attr);
     declare("authentication", S_authentication);
+
     declare("authorization", S_authorization);
     declare("before", S_before);
     declare("chap", S_chap);
@@ -121,6 +122,15 @@ parser_init(void)
     declare("PAM", S_pam);
 #endif
     declare("syslog", S_syslog);
+#ifdef HAVE_LDAP
+    declare("ldap", S_ldap);
+    declare("url", S_url);
+    declare("password", S_password);
+    declare("user_basedn", S_user_basedn);
+    declare("group_basedn", S_group_basedn);
+    declare("filter", S_filter);
+    declare("attributes", S_attributes);
+#endif    
 }
 
 /* Return a keyword code if a keyword is recognized. 0 otherwise */
@@ -266,5 +276,22 @@ codestring(int type)
 #endif
     case S_syslog:
 	return("syslog");
+#ifdef HAVE_LDAP
+    case S_ldap:
+	return("ldap");
+    case S_url:
+	return("url");
+    case S_password:
+	return("password");	
+    case S_user_basedn:
+	return("user_basedn");
+    case S_group_basedn:
+	return("group_basedn");
+    case S_filter:
+	return("filter");
+    case S_attributes:
+	return("attributes");
+#endif	
     }
+	
 }

@@ -321,9 +321,20 @@ struct session {
     char *peer;                    /* name of connected peer */
     char *peerip;                  /* ip of connected peer */
     char *cfgfile;                 /* config file name */
-    char *acctfile;                /* name of accounting file */
+    char *acctfile;                /* name of accounting file */    
     char port[NAS_PORT_MAX_LEN+1]; /* For error reporting */
     u_char version;                /* version of last packet read */
+#ifdef HAVE_LDAP
+    LDAP *ldap;			   /* ldap base structure */
+    int  use_ldap;		   /* status flag 0 - do not use, 1 - bind successful */
+    char *ldap_url;                /* ldap server connection url */
+    char *ldap_user_dn;		   /* ldap username */
+    char *ldap_password;	   /* ldap password */
+    char *ldap_user_base_dn;       /* ldap server user base dn */
+    char *ldap_group_base_dn;      /* ldap server group base dn */
+    char *ldap_filter;             /* ldap server search filter */
+    char *ldap_attributes;         /* ldap server search attributes */    
+#endif
 };
 
 extern struct session session;     /* the session */

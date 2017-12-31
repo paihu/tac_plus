@@ -373,7 +373,7 @@ the <group> has to be defined.
 .TP
 .B password_spec
 There are five authentication mechanisms available: no password, cleartext,
-DES, PAM, a file in
+DES, PAM, LDAP a file in
 .BR passwd(5)
 format, and skey.
 .sp
@@ -382,6 +382,7 @@ format, and skey.
     cleartext <string>
     des <des_string>
     PAM
+    LDAP
     skey
     nopassword
 .fi
@@ -398,6 +399,47 @@ enable authorization, and does not support OTP-like challenge system (ie:
 no additional prompting).
 The daemon must be built with PAM support, which is included by default
 if libpam is found.
+.sp
+LDAP you can use ldap for user authentication and user group member specification.
+In configuration you have to specify ldap connection attributes:
+.sp
+.nf
+ldap url = "ldap://127.0.0.1"
+ldap user = "cn=Manager,dc=domain,dc=com"
+ldap password = secret
+ldap user_basedn = "ou=users,dc=domain,dc=com"
+ldap group_basedn = "ou=tacacs,ou=groups,dc=domain,dc=com"
+.fi
+.sp
+and user default:
+.sp
+.nf
+user = DEFAULT {
+        login = ldap
+}
+.fi
+.sp
+.nf
+or in group configuration:
+.sp
+.nf
+group = admin1 {
+        login = ldap
+}
+.fi
+.sp
+In ldap server should be standard posix users/groups with attribute
+userPassword/memberUid
+.sp
+.nf
+group record:
+dn: cn=admin1,ou=tacacs,ou=groups,dc=domain,dc=com
+objectClass: posixGroup
+objectClass: top
+cn: admin1
+gidNumber: 1234
+memberUid: login
+.fi
 .sp
 Note: some cases of <password_spec> do not accept all of these mechanisms.
 .\"

@@ -726,6 +726,12 @@ AC_CHECK_LIB([pam], [pam_start],
 	[AC_DEFINE(HAVE_PAM)
 	 LIBS="-lpam $LIBS"])
 
+# look for LDAP
+AH_TEMPLATE(HAVE_LDAP, [define if your system has libldap])
+AC_CHECK_LIB([ldap], [ldap_init],
+        [AC_DEFINE(HAVE_LDAP)
+         LIBS="-lldap -llber $LIBS"])
+
 # check includes/headers
 AC_HEADER_STDC
 AC_HEADER_TIME

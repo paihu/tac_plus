@@ -90,6 +90,11 @@
 #include "pathsl.h"
 #include "md5.h"
 
+#ifdef HAVE_LDAP
+#include <lber.h>
+#include <ldap.h>
+#endif
+
 typedef struct tac_plus_pak_hdr HDR;
 
 /*
@@ -200,6 +205,17 @@ struct session {
     char *acctfile;                /* name of accounting file */
     char port[NAS_PORT_MAX_LEN+1]; /* For error reporting */
     u_char version;                /* version of last packet read */
+#ifdef HAVE_LDAP
+    LDAP *ldap;			   /* ldap base structure */
+    int  use_ldap;		   /* status flag 0 - do not use, 1 - bind successful */
+    char *ldap_url;                /* ldap server connection url */
+    char *ldap_user_dn;		   /* ldap username */
+    char *ldap_password;	   /* ldap password */
+    char *ldap_user_base_dn;       /* ldap server user base dn */
+    char *ldap_group_base_dn;      /* ldap server group base dn */
+    char *ldap_filter;             /* ldap server search filter */
+    char *ldap_attributes;         /* ldap server search attributes */    
+#endif
 };
 
 extern struct session session;     /* the session */
@@ -216,13 +232,6 @@ extern int single;                 /* do not fork (for debugging) */
 extern struct timeval started_at;
 extern char *wtmpfile;
 extern int wtmpfd;
-
-/* extend default authentication */
-int default_authen_type;
-#define TAC_PLUS_DEFAULT_AUTHEN_TYPE_FILE  1
-#if HAVE_PAM
-#define TAC_PLUS_DEFAULT_AUTHEN_TYPE_PAM   2
-#endif
 
 #define HASH_TAB_SIZE 157        /* user and group hash table sizes */
 
@@ -283,6 +292,7 @@ struct acct_reply {
 #define DEBUG_PROXY_FLAG     16384
 #define DEBUG_MAXSESS_FLAG   32768
 #define DEBUG_LOCK_FLAG      65536
+#define DEBUG_LDAP_FLAG      131072
 
 #define TAC_IS_USER           1
 #define TAC_PLUS_RECURSE      1
@@ -396,6 +406,7 @@ int	cfg_get_host_noenablepwd(char *);
 #endif
 char	*cfg_get_host_prompt(char *);
 char	*cfg_get_login_secret(char *, int);
+char	*cfg_get_login_password(char *, int);
 #ifdef MSCHAP
 char	*cfg_get_mschap_secret(char *, int);
 #endif
@@ -408,7 +419,11 @@ char	*cfg_nodestring(int);
 int	cfg_ppp_is_configured(char *, int);
 int	cfg_read_config(char *);
 int	cfg_user_exists(char *);
+int	cfg_group_exists(char *);
 int	cfg_user_svc_default_is_permit(char *);
+#ifdef HAVE_LDAP
+void update_config(char *name,char *member);
+#endif
 
 /* default_fn.c */
 int	default_fn(struct authen_data *);
@@ -459,6 +474,15 @@ int enable_fn(struct authen_data *data);
 int sendauth_fn(struct authen_data *data);
 int sendpass_fn(struct authen_data *data);
 int skey_fn(struct authen_data *data);
+#ifdef HAVE_LDAP
+int ldap_get_group(LDAP *ldap,char *name);
+char* ldap_search(LDAP *ldap,char *name);
+int ldap_verify(char *name,char *password);
+int ldap_init(LDAP **ldap,char *username,char *password);
+void ldap_close(LDAP *ldap);
+#endif
+
+
 
 /* tac_plus.c */
 void open_logfile(void);

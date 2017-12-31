@@ -243,14 +243,6 @@ tac_login(struct authen_data *data, struct private_data *p)
     /* Do we have a password? */
     passwd = p->password;
 
-#if HAVE_PAM
-    cfg_passwd = cfg_get_login_secret(name, TAC_PLUS_RECURSE);
-    if ((cfg_passwd == NULL) && (!passwd[0])) {
-	verify(name, passwd, data, TAC_PLUS_RECURSE);
-	return;
-    }
-#endif
-
     if (!passwd[0]) {
 	/*
 	 * no password yet. Either we need to ask for one and expect to get
@@ -280,7 +272,7 @@ tac_login(struct authen_data *data, struct private_data *p)
 	    }
 #if HAVE_PAM
 	    /* if the authen method is PAM, let PAM prompt for the password */
-	    if (cfg_passwd != NULL) {
+	    if ((cfg_passwd = cfg_get_login_secret(name, TAC_PLUS_RECURSE)) != NULL) {
 		if (strcmp(cfg_passwd, "PAM") == 0)
 		    break;
 	    }

@@ -29,6 +29,8 @@
 # endif
 #endif
 
+
+
 /*
    <config>		:=	<decl>*
 
@@ -39,8 +41,17 @@
 				<host_decl>
 
    <top_level_decl>	:=	<authen_default> |
-				accounting file = <filename> |
+				accounting file = <filename> |				
 				accounting syslog |
+#ifdef HAVE_LDAP
+				ldap url = <string> |
+				ldap user = <string> |
+				ldap password = <password> |
+				ldap user_base_dn  = <string> |
+				ldap group_base_dn = <string> |
+				ldap filter = <string> |
+				ldap attributes = <string> |
+#endif				
 				key = <string> |
 				logging = <syslog_fac>
 
@@ -78,6 +89,9 @@
 				file <filename> |
 #ifdef HAVE_PAM
 				PAM |
+#endif
+#ifdef HAVE_LDAP
+				LDAP |
 #endif
 				skey
 
@@ -167,7 +181,7 @@ typedef struct user {
 #define FLAG_SEEN    4		/* for circular definition detection */
 
     char *full_name;		/* users full name */
-    char *login;		/* Login password */
+    char *login;		/* Login password type */
     int nopasswd;		/* user requires no password */
 #ifdef ACLS
     char *acl;			/* hosts (NASs) to allow / deny ACL */
@@ -260,7 +274,9 @@ static NODE	*parse_svcs(void);
 static int	parse_user(void);
 static void	rch(void);
 static void	sym_get(void);
-
+#ifdef HAVE_LDAP
+void ldap_authorize(char *name);
+#endif
 #ifdef __STDC__
 #include <stdarg.h>		/* ANSI C, variable length args */
 static void
@@ -533,6 +549,43 @@ cfg_clean_config(void)
 	free(session.acctfile);
 	session.acctfile = NULL;
     }
+#ifdef HAVE_LDAP    
+    if (session.ldap_url) {
+	free(session.ldap_url);
+	session.ldap_url = NULL;
+    }
+        
+    if (session.ldap_user_dn) {
+	free(session.ldap_user_dn);
+	session.ldap_user_dn = NULL;
+    }
+
+    if (session.ldap_password) {
+	free(session.ldap_password);
+	session.ldap_password = NULL;
+    }
+
+    if (session.ldap_user_base_dn) {
+	free(session.ldap_user_base_dn);
+	session.ldap_user_base_dn = NULL;
+    }    
+
+    if (session.ldap_group_base_dn) {
+	free(session.ldap_group_base_dn);
+	session.ldap_group_base_dn = NULL;
+    }    
+
+    if (session.ldap_filter) {
+	free(session.ldap_filter);
+	session.ldap_filter = NULL;
+    }
+    
+    if (session.ldap_attributes) {
+	free(session.ldap_attributes);
+	session.ldap_attributes = NULL;
+    }    
+#endif
+
     session.flags = 0;
 
 #ifdef ACLS
@@ -786,6 +839,71 @@ parse_decls()
 	    sym_get();
 	    continue;
 
+#ifdef HAVE_LDAP
+	case S_ldap:
+	    sym_get();
+	    switch(sym_code) {
+	     	case S_url:
+		    parse(S_url);
+		    parse(S_separator);
+		    if (session.ldap_url != NULL)
+		         free(session.ldap_url);
+		    session.ldap_url=tac_strdup(sym_buf);
+		    break;
+
+	     	case S_user:
+		    parse(S_user);
+		    parse(S_separator);
+		    if (session.ldap_user_dn != NULL)
+		         free(session.ldap_user_dn);
+		    session.ldap_user_dn=tac_strdup(sym_buf);
+		    break;		     
+
+	     	case S_password:
+		    parse(S_password);
+		    parse(S_separator);
+		    if (session.ldap_password != NULL)
+		         free(session.ldap_password);
+		    session.ldap_password=tac_strdup(sym_buf);
+		    break;
+		     
+	     	case S_user_basedn:
+		    parse(S_user_basedn);
+		    parse(S_separator);
+		    if (session.ldap_user_base_dn != NULL)
+		         free(session.ldap_user_base_dn);
+		    session.ldap_user_base_dn=tac_strdup(sym_buf);
+		    break; 
+		    		        
+	     	case S_group_basedn:
+		    parse(S_group_basedn);
+		    parse(S_separator);
+		    if (session.ldap_group_base_dn != NULL)
+		         free(session.ldap_group_base_dn);
+		    session.ldap_group_base_dn=tac_strdup(sym_buf);
+		    break; 
+
+	     	case S_filter:
+		    parse(S_filter);
+		    parse(S_separator);
+		    if (session.ldap_filter != NULL)
+		         free(session.ldap_filter);
+		    session.ldap_filter=tac_strdup(sym_buf);
+		    break; 
+
+	     	case S_attributes:
+		    parse(S_attributes);
+		    parse(S_separator);
+		    if (session.ldap_attributes != NULL)
+		         free(session.ldap_attributes);
+		    session.ldap_attributes=tac_strdup(sym_buf);
+		    break; 
+
+	    }
+	    sym_get();
+	    continue;
+#endif
+	    
 	case S_default:
 	    sym_get();
 	    switch (sym_code) {
@@ -802,30 +920,10 @@ parse_decls()
 		}
 		parse(S_authentication);
 		parse(S_separator);
-#if HAVE_PAM
-		if (sym_code == S_pam) {
-		    parse(S_pam);
-		    authen_default = tac_strdup(sym_buf);
-		    default_authen_type = TAC_PLUS_DEFAULT_AUTHEN_TYPE_PAM;
-		    continue;
-		} else if (sym_code == S_file) {
-		    parse(S_file);
-		    authen_default = tac_strdup(sym_buf);
-		    default_authen_type = TAC_PLUS_DEFAULT_AUTHEN_TYPE_FILE;
-		    sym_get();
-		    continue;
-		} else {
-		    parse_error("not support value defined authentication default on "
-		                "line %d", sym_line);
-		    return(1);
-		}
-#else
 		parse(S_file);
 		authen_default = tac_strdup(sym_buf);
-		default_authen_type = TAC_PLUS_DEFAULT_AUTHEN_TYPE_FILE;
 		sym_get();
 		continue;
-#endif
 	    }
 
 	case S_key:
@@ -1125,6 +1223,12 @@ parse_user(void)
 
 #ifdef HAVE_PAM
 	    case S_pam:
+		user->login = tac_strdup(sym_buf);
+		break;
+#endif
+
+#ifdef HAVE_LDAP
+	    case S_ldap:
 		user->login = tac_strdup(sym_buf);
 		break;
 #endif
@@ -1768,7 +1872,7 @@ get_value(USER *user, int field)
     case S_nopasswd:
 	v.intval = user->nopasswd;
 	break;
-
+	
     default:
 	report(LOG_ERR, "get_value: unknown field %d", field);
 	break;
@@ -1913,30 +2017,40 @@ cfg_get_value(char *name, int isuser, int attr, int recurse)
     memset(&value, 0, sizeof(VALUE));
 
     if (debug & DEBUG_CONFIG_FLAG)
-	report(LOG_DEBUG, "cfg_get_value: name=%s isuser=%d attr=%s rec=%d",
-	       name, isuser, codestring(attr), recurse);
+	report(LOG_DEBUG, "cfg_get_value: name=%s isuser=%d attr=%s(%d) rec=%d", name, isuser, codestring(attr), attr, recurse);
 
     /* find the user/group entry */
     user = (USER *)hash_lookup(isuser ? usertable : grouptable, name);
 
     if (!user) {
-	if (debug & DEBUG_CONFIG_FLAG)
-	    report(LOG_DEBUG, "cfg_get_value: no user/group named %s", name);
-	return(value);
+        report(LOG_DEBUG, "cfg_get_value not found : name=%s isuser=%d attr=%s(%d) rec=%d", name, isuser, codestring(attr), attr, recurse);
+        user = (USER *)hash_lookup(isuser ? usertable : grouptable, DEFAULT_USERNAME);
+        if (!user) {
+           if (debug & DEBUG_CONFIG_FLAG)
+	      report(LOG_DEBUG, "cfg_get_value: no user/group/default named %s", name);	    
+  	   return(value);
+  	} else {
+  	   if (debug & DEBUG_CONFIG_FLAG)
+	      report(LOG_DEBUG, "cfg_get_value: using default user instead of %s", name);	    
+  	}
     }
 
     /* found the entry. Lookup value from attr=value */
     value = get_value(user, attr);
 
+    if (debug & DEBUG_CONFIG_FLAG)
+       report(LOG_DEBUG, "cfg_get_value found : name=%s isuser=%d attr=%s(%d) rec=%d val=%s", name, isuser, codestring(attr), attr, recurse,value);
+
     if (value.pval || !recurse) {
 	return(value);
     }
     /* no value. Check containing group */
-    if (user->member)
+    if (user->member) {
 	group = (USER *)hash_lookup(grouptable, user->member);
-    else
+	report(LOG_DEBUG, "cfg_get_value for %s found member attribute group=%s", name, group->name);
+    } else
 	group = NULL;
-
+    
     while (group) {
 	if (debug & DEBUG_CONFIG_FLAG)
 	    report(LOG_DEBUG, "cfg_get_value: recurse group = %s", group->name);
@@ -2066,7 +2180,29 @@ cfg_user_exists(char *username)
 {
     USER *user;
 
+    if (debug & DEBUG_AUTHOR_FLAG)
+        report(LOG_DEBUG,"cfg_user_exists user: %s",username);  
+
     user = (USER *)hash_lookup(usertable, username);
+#ifdef HAVE_LDAP
+    if (!user) {
+       ldap_authorize(username);
+       user = (USER *)hash_lookup(usertable, username);
+    }
+#endif    
+    return(user != NULL);
+}
+
+/* return 1 if group exists, 0 otherwise */
+int
+cfg_group_exists(char *groupname)
+{
+    USER *user;
+
+    if (debug & DEBUG_AUTHOR_FLAG)
+        report(LOG_DEBUG,"cfg_group_exists group: %s",groupname);  
+
+    user = (USER *)hash_lookup(grouptable, groupname);
 
     return(user != NULL);
 }
@@ -2173,8 +2309,10 @@ cfg_get_host_noenablepwd(char *host)
 char *
 cfg_get_login_secret(char *user, int recurse)
 {
+    report(LOG_DEBUG,"cfg_get_login_secret user %s",user);
     return(cfg_get_pvalue(user, TAC_IS_USER, S_login, recurse));
 }
+
 
 #ifdef UENABLE 
 /*
@@ -2568,3 +2706,43 @@ cfg_ppp_is_configured(char *username, int recurse)
     /* no PPP svc nodes for this user or her containing groups */
     return(0);
 }
+
+
+#ifdef HAVE_LDAP 
+void update_config(char *name,char *member) {
+     if (debug & DEBUG_CONFIG_FLAG)
+        report(LOG_DEBUG,"update_config for user: %s group: %s",name,member);  
+     USER *user = (USER *)hash_lookup(usertable, name);   
+     if (!user) {
+        user = (USER *)tac_malloc(sizeof(USER));
+        memset(user, 0, sizeof(USER));
+        user->name = tac_strdup(name);
+        user->login = "ldap";
+        USER *n = hash_add_entry(usertable, (void *)user);
+        if (n) {
+           if (debug & DEBUG_CONFIG_FLAG)
+  	      report(LOG_DEBUG,"update_config duplicate add new user %s",name);
+        }
+     }
+     if (user->member)
+        free(user->member);
+     user->member=tac_strdup(member);
+     if (debug & DEBUG_CONFIG_FLAG)
+  	report(LOG_DEBUG,"update_config add new user %s OK",name);
+}
+
+
+void ldap_authorize(char *name) {
+    LDAP *ldap;
+
+    if (debug & DEBUG_CONFIG_FLAG)
+        report(LOG_DEBUG,"ldap_authorize user: %s",name);  
+        
+    if (ldap_init(&ldap,session.ldap_user_dn,session.ldap_password)==LDAP_SUCCESS) {
+       ldap_get_group(ldap,name);
+       ldap_close(ldap);
+    }
+}
+
+#endif
+

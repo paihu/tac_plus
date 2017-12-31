@@ -481,3 +481,6 @@ F4.0.4.28
 	- initialize newsockfd in main() - from David M. Syzdek
 	- recent changes in autoconf are causing the + of the package name to
 	  become -, so just drop it from the tarball name.
+
+F4.0.4.29
+	- add ldap support for user password and user group member

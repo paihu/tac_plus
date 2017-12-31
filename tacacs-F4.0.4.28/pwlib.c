@@ -114,7 +114,7 @@ set_expiration_status(char *exp_date, struct authen_data *data)
 
 /*
  * Verify that this user/password is valid.  Works only for cleartext, file,
- * PAM and des passwords.  Return 1 if password is valid.
+ * PAM LDAP and des passwords.  Return 1 if password is valid.
  */
 int
 verify(char *name, char *passwd, struct authen_data *data, int recurse)
@@ -143,25 +143,10 @@ verify(char *name, char *passwd, struct authen_data *data, int recurse)
      * has been issued, attempt to use this password file
      */
     if (cfg_passwd == NULL) {
-	if (default_authen_type == TAC_PLUS_DEFAULT_AUTHEN_TYPE_FILE) {
-	    char *file = cfg_get_authen_default();
-	    if (file) {
-	        return(passwd_file_verify(name, passwd, data, file));
-	    }
-#if HAVE_PAM
-	} else if (default_authen_type == TAC_PLUS_DEFAULT_AUTHEN_TYPE_PAM) {
-	    /* try to verify the password via PAM */
-	    if (!pam_verify(name, passwd)) {
-	        data->status = TAC_PLUS_AUTHEN_STATUS_FAIL;
-	        return(0);
-	    } else
-		data->status = TAC_PLUS_AUTHEN_STATUS_PASS;
-
-	    exp_date = cfg_get_expires(name, recurse);
-	    set_expiration_status(exp_date, data);
-	    return(data->status == TAC_PLUS_AUTHEN_STATUS_PASS);
-#endif
-        }
+	char *file = cfg_get_authen_default();
+	if (file) {
+	    return(passwd_file_verify(name, passwd, data, file));
+	}
 
 	/* otherwise, we fail */
 	data->status = TAC_PLUS_AUTHEN_STATUS_FAIL;
@@ -182,7 +167,27 @@ verify(char *name, char *passwd, struct authen_data *data, int recurse)
 	set_expiration_status(exp_date, data);
 	return(data->status == TAC_PLUS_AUTHEN_STATUS_PASS);
     }
-#endif
+#endif    
+
+#if HAVE_LDAP
+    if (strcmp(cfg_passwd, "ldap") == 0) {
+	/* try to verify the password via LDAP */
+	if (ldap_verify(name,passwd)!=TAC_PLUS_AUTHEN_STATUS_PASS) {
+	    if (debug & DEBUG_PASSWD_FLAG)
+		report(LOG_DEBUG, "Ldap Password is incorrect");
+	    data->status = TAC_PLUS_AUTHEN_STATUS_FAIL;
+	    return(0);
+	} else {
+	    data->status = TAC_PLUS_AUTHEN_STATUS_PASS;
+	    if (debug & DEBUG_PASSWD_FLAG)
+		report(LOG_DEBUG, "Ldap Password is correct");
+	}
+	
+	exp_date = cfg_get_expires(name, recurse);
+	set_expiration_status(exp_date, data);
+	return(data->status == TAC_PLUS_AUTHEN_STATUS_PASS);
+    }
+#endif    
 
     p = tac_find_substring("cleartext ", cfg_passwd);
     if (p != NULL) {
@@ -663,4 +668,171 @@ pam_verify(char *user, char *passwd)
     pam_end(pamh, err);
     return(0);
 }
+#endif
+
+#ifdef HAVE_LDAP
+int ldap_init(LDAP **ldap,char *username,char *password) {
+
+    int auth_method     = LDAP_AUTH_SIMPLE;
+    int desired_version = LDAP_VERSION3;
+    
+    struct berval cred;
+    struct berval *servcred;
+  
+    if (debug & DEBUG_LDAP_FLAG)
+       report(LOG_DEBUG,"ldap initialize");
+
+    if (ldap_initialize(ldap,session.ldap_url)!=LDAP_SUCCESS) {
+       report(LOG_ERR,"ldap_initialize failed");
+       return(LDAP_OPERATIONS_ERROR);
+    }
+
+    int ret=ldap_set_option(*ldap, LDAP_OPT_PROTOCOL_VERSION, &desired_version);
+    if (ret) {
+      report(LOG_ERR,"ldap_set_option %s",ldap_err2string(ret));
+      return(ret);
+    }
+ 
+    cred.bv_val=password;
+    cred.bv_len = strlen(password);
+    
+    if (debug & DEBUG_LDAP_FLAG)
+       report(LOG_DEBUG,"ldap user dn: %s",username);
+ 
+    ret=ldap_sasl_bind_s(*ldap,username,LDAP_SASL_SIMPLE,&cred,NULL,NULL,&servcred);
+    if (ret) {
+      report(LOG_ERR,"ldap_sasl_bind_s %s (%d) user: %s",ldap_err2string(ret),ret,username);
+      if (debug & DEBUG_LDAP_FLAG)
+         report(LOG_DEBUG,"ldap_sasl_bind_s %s (%d)",ldap_err2string(ret),ret);
+    } else {    
+       if (debug & DEBUG_LDAP_FLAG)
+          report(LOG_DEBUG,"ldap successful bind to %s",session.ldap_url);
+    }   
+    return(ret);   
+
+}
+
+void ldap_close(LDAP *ldap) {
+     if (debug & DEBUG_LDAP_FLAG)
+        report(LOG_DEBUG,"ldap unbind from: %s",session.ldap_url);
+     int ret = ldap_unbind_ext_s(ldap,NULL,NULL);
+     if (ret)
+        report(LOG_ERR, "ldap_unbind_s: %s", ldap_err2string(ret));
+}
+
+int ldap_get_group(LDAP *ldap,char *name) {
+    int retvalue=TAC_PLUS_AUTHEN_STATUS_FAIL;
+    char *member=ldap_search(ldap,name);
+    if (member) {
+       /* check if group exists in config */
+       if (cfg_group_exists(member)) {
+          update_config(name,member);
+          retvalue=TAC_PLUS_AUTHEN_STATUS_PASS;
+       } else {
+          if (debug & DEBUG_LDAP_FLAG)
+             report(LOG_DEBUG,"ldap group %s for user %s not found in tacacs config",member,name);
+          report(LOG_ERR,"ldap group %s for user %s not found in tacacs config",member,name);
+       }
+       free(member);        
+    } 
+    return (retvalue);
+}
+
+int ldap_verify(char *name,char *password) {
+    int retvalue=TAC_PLUS_AUTHEN_STATUS_FAIL;
+    LDAP *ldap;    
+    char *user_prefix="uid=";
+
+    if (debug & DEBUG_LDAP_FLAG)
+       report(LOG_DEBUG,"ldap_verify start user: %s password: %s",name,password);
+    
+    /* ldap username format: uid=username,ldap_user_base_dn; */
+    int new_len=strlen(session.ldap_user_base_dn)+strlen(name)+strlen(user_prefix)+2;
+    char *ldap_username=tac_malloc(new_len);
+    memset(ldap_username, 0, new_len);
+    strncat(ldap_username,user_prefix,strlen(user_prefix));
+    strncat(ldap_username,name,strlen(name));
+    strncat(ldap_username,",",strlen(","));
+    strncat(ldap_username,session.ldap_user_base_dn,strlen(session.ldap_user_base_dn));
+    
+    if (ldap_init(&ldap,ldap_username,password)==LDAP_SUCCESS) {
+       retvalue=ldap_get_group(ldap,name);
+    }
+    ldap_close(ldap);
+    free(ldap_username);    
+    if (debug & DEBUG_LDAP_FLAG)
+             report(LOG_DEBUG,"ldap_verify return value: %d",retvalue);
+    return (retvalue);
+}
+
+char* ldap_search(LDAP *ldap,char *name) {
+      BerElement* ber;
+      LDAPMessage* msg;
+      LDAPMessage* entry;
+      char *group=NULL;
+      char *attr;
+      struct berval **vals;
+      int sizelimit=10;
+      char *attrs[]={"cn",NULL};
+      int ldap_search_timeout=3;
+      struct timeval search_timeout;
+      memset(&search_timeout, 0, sizeof(struct timeval));
+      search_timeout.tv_sec=ldap_search_timeout;
+      
+      /* ldap filter format: (memberUid=name) */
+      char *filter1="(memberUid=";
+      int new_len=strlen(filter1)+strlen(name)+2;
+      char *filter=malloc(new_len);
+      memset(filter, 0, new_len);
+      strncat(filter,filter1,strlen(filter1));
+      strncat(filter,name,strlen(name));
+      strncat(filter,")",strlen(")"));
+      
+      if (debug & DEBUG_LDAP_FLAG)
+         report(LOG_DEBUG, "ldap_search for group filter: %s",filter);
+      int ret=ldap_search_ext_s(ldap,session.ldap_group_base_dn,LDAP_SCOPE_SUBTREE,filter,attrs,0,NULL,NULL,&search_timeout,sizelimit,&msg);
+      if (ret) {
+         report(LOG_ERR,"ldap_search_ext_s %s",ldap_err2string(ret));
+         return NULL;
+      }
+      if (debug & DEBUG_LDAP_FLAG)
+	 report(LOG_DEBUG,"ldap_search_ext_s %s",ldap_err2string(ret));	 
+  
+      if (ldap_count_entries(ldap, msg)==1) {
+         entry = ldap_first_entry(ldap, msg);
+         if (entry!=NULL) {
+            attr = ldap_first_attribute(ldap, entry, &ber);
+            if (attr != NULL) {
+               vals = ldap_get_values_len(ldap, entry, attr);
+               if (vals!=NULL) {
+                  if (ldap_count_values_len(vals)==1) {
+                     group=malloc(vals[0]->bv_len+1);
+                     memset(group,0,vals[0]->bv_len+1);
+                     strncpy(group,vals[0]->bv_val,vals[0]->bv_len);
+                  }
+                  ldap_value_free_len(vals);
+               }               
+               ldap_memfree(attr);
+            }
+            if (ber != NULL)
+               ber_free(ber,0);
+         }        
+      } else {
+         if (ldap_count_entries(ldap, msg)==0) {
+            if (debug & DEBUG_LDAP_FLAG)
+               report(LOG_DEBUG,"user %s is not member of any tacacs group",name);
+	     report(LOG_ERR,"user %s is not member of any tacacs group",name);
+         } else {
+            if (debug & DEBUG_LDAP_FLAG)
+	       report(LOG_DEBUG,"user %s is member of more than one(%d) group",name,ldap_count_entries(ldap, msg));
+	    report(LOG_ERR,"user %s is member of more than one(%d) group",name,ldap_count_entries(ldap, msg));   
+         }
+      }
+      ldap_msgfree(msg);
+      free(filter);
+      if (debug & DEBUG_LDAP_FLAG)
+	 report(LOG_DEBUG,"ldap_search name: %s group: %s",name,group);	 
+      return (group);
+}
+
 #endif

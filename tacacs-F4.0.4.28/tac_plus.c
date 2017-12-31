@@ -277,7 +277,7 @@ main(int argc, char **argv)
     struct pollfd *pfds;
 
 #ifndef SOMAXCONN
-# define SOMAXCONN 64
+# define SOMAXCONN 512
 #endif
     somaxconn = SOMAXCONN;
 
@@ -388,6 +388,8 @@ main(int argc, char **argv)
 
     if (debug)
 	report(LOG_DEBUG, "tac_plus server %s starting", version);
+
+
 
     if (!standalone) {
 	/* running under inetd */
@@ -613,6 +615,9 @@ main(int argc, char **argv)
 	pfds[c].events = POLLIN | POLLERR | POLLHUP | POLLNVAL;
     }
 
+    
+
+
     for (;;) {
 #if HAVE_PID_T
 	pid_t pid;
@@ -713,12 +718,12 @@ main(int argc, char **argv)
 #if PROFILE
 	    moncontrol(1);
 #endif
-
 	    start_session();
 	    shutdown(session.sock, 2);
 	    close(session.sock);
-	    if (!single)
+	    if (!single) {
 		tac_exit(0);
+            }
 	} else {
 	    if (debug & DEBUG_FORK_FLAG)
 		report(LOG_DEBUG, "forked %ld", (long)pid);
@@ -772,6 +777,7 @@ start_session(void)
 {
     u_char *pak;
     HDR *hdr;
+
 
     do {
 	session.seq_no = 0;
@@ -998,6 +1004,8 @@ vers(void)
 #if __STDC__
     fprintf(stdout, "__STDC__\n");
 #endif
-
+#ifdef HAVE_LDAP
+    fprintf(stdout, "LDAP\n");
+#endif
     return;
 }
