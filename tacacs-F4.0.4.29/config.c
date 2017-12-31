@@ -2023,7 +2023,8 @@ cfg_get_value(char *name, int isuser, int attr, int recurse)
     user = (USER *)hash_lookup(isuser ? usertable : grouptable, name);
 
     if (!user) {
-        report(LOG_DEBUG, "cfg_get_value not found : name=%s isuser=%d attr=%s(%d) rec=%d", name, isuser, codestring(attr), attr, recurse);
+        if (debug & DEBUG_CONFIG_FLAG)
+           report(LOG_DEBUG, "cfg_get_value not found : name=%s isuser=%d attr=%s(%d) rec=%d", name, isuser, codestring(attr), attr, recurse);
         user = (USER *)hash_lookup(isuser ? usertable : grouptable, DEFAULT_USERNAME);
         if (!user) {
            if (debug & DEBUG_CONFIG_FLAG)
@@ -2047,7 +2048,8 @@ cfg_get_value(char *name, int isuser, int attr, int recurse)
     /* no value. Check containing group */
     if (user->member) {
 	group = (USER *)hash_lookup(grouptable, user->member);
-	report(LOG_DEBUG, "cfg_get_value for %s found member attribute group=%s", name, group->name);
+	if (debug & DEBUG_CONFIG_FLAG)
+	   report(LOG_DEBUG, "cfg_get_value for %s found member attribute group=%s", name, group->name);
     } else
 	group = NULL;
     
@@ -2309,7 +2311,8 @@ cfg_get_host_noenablepwd(char *host)
 char *
 cfg_get_login_secret(char *user, int recurse)
 {
-    report(LOG_DEBUG,"cfg_get_login_secret user %s",user);
+    if (debug & DEBUG_AUTHEN_FLAG)
+       report(LOG_DEBUG,"cfg_get_login_secret user %s",user);
     return(cfg_get_pvalue(user, TAC_IS_USER, S_login, recurse));
 }
 
