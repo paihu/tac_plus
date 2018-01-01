@@ -427,7 +427,7 @@ passwd_file_verify(char *user, char *supplied_passwd, struct authen_data *data,
     char *cfg_passwd;
 
     data->status = TAC_PLUS_AUTHEN_STATUS_FAIL;
-    
+
     if (filename && STREQ(filename, "/etc/passwd")) {
 	return(etc_passwd_file_verify(user, supplied_passwd, data));
     }
@@ -537,7 +537,7 @@ pam_tacacs(int nmsg, const struct pam_message **pmpp, struct pam_response
 	    /* pre-supplied password, such as service=PAP, or prompt for it */
 	    if (passwd != NULL && strlen(passwd) > 0) {
 		prpp[i]->resp = tac_strdup(passwd);
-	    } else {	        
+	    } else {
 		send_authen_reply(TAC_PLUS_AUTHEN_STATUS_GETPASS,
 				  (char *)pmpp[i]->msg,
 				  pmpp[i]->msg ? strlen(pmpp[i]->msg) : 0,
@@ -560,6 +560,7 @@ pam_tacacs(int nmsg, const struct pam_message **pmpp, struct pam_response
 		prpp[i]->resp = (char *)tac_malloc(acp->user_msg_len + 1);
 		memcpy(prpp[i]->resp, rp, acp->user_msg_len);
 		prpp[i]->resp[acp->user_msg_len] = '\0';
+		
 		free(reply);
 	    }
 	    break;
