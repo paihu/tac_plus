@@ -243,6 +243,20 @@ tac_login(struct authen_data *data, struct private_data *p)
     /* Do we have a password? */
     passwd = p->password;
 
+#if HAVE_PAM
+/*
+    cfg_passwd = cfg_get_login_secret(name, TAC_PLUS_RECURSE);
+    report(LOG_DEBUG,"tac_login HAVE_PAM user: %s cfg_passwd: %s password: %s",name,cfg_passwd,passwd);
+    if ((cfg_passwd == NULL) && (!passwd[0])) {
+        report(LOG_DEBUG,"tac_login pam verify user: %s",name);
+	verify(name, passwd, data, TAC_PLUS_RECURSE);
+	if (debug & DEBUG_PASSWD_FLAG)
+           report(LOG_DEBUG,"tac_login verify user: %s",name);
+	return;
+    }    
+*/    
+#endif
+
     if (!passwd[0]) {
 	/*
 	 * no password yet. Either we need to ask for one and expect to get
@@ -272,10 +286,19 @@ tac_login(struct authen_data *data, struct private_data *p)
 	    }
 #if HAVE_PAM
 	    /* if the authen method is PAM, let PAM prompt for the password */
-	    if ((cfg_passwd = cfg_get_login_secret(name, TAC_PLUS_RECURSE)) != NULL) {
-		if (strcmp(cfg_passwd, "PAM") == 0)
-		    break;
-	    }
+	    //if (cfg_passwd != NULL) {
+            /*if ((cfg_passwd = cfg_get_login_secret(name, TAC_PLUS_RECURSE)) != NULL) {
+	    	if (strcmp(cfg_passwd, "PAM") == 0)
+	    	   break;
+	    */
+	     cfg_passwd = cfg_get_login_secret(name, TAC_PLUS_RECURSE);
+	     if (cfg_passwd != NULL) {
+  	        if (strcmp(cfg_passwd, "PAM") == 0) {
+	           //verify(name, passwd, data, TAC_PLUS_RECURSE);
+	           //return;
+	           break;
+	        }
+ 	     }
 #endif
 	    /* FALL-THRU */
 	default:

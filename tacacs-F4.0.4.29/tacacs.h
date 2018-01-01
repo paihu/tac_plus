@@ -321,7 +321,7 @@ struct session {
     char *peer;                    /* name of connected peer */
     char *peerip;                  /* ip of connected peer */
     char *cfgfile;                 /* config file name */
-    char *acctfile;                /* name of accounting file */    
+    char *acctfile;                /* name of accounting file */
     char port[NAS_PORT_MAX_LEN+1]; /* For error reporting */
     u_char version;                /* version of last packet read */
 #ifdef HAVE_LDAP

@@ -41,7 +41,7 @@
 				<host_decl>
 
    <top_level_decl>	:=	<authen_default> |
-				accounting file = <filename> |				
+				accounting file = <filename> |
 				accounting syslog |
 #ifdef HAVE_LDAP
 				ldap url = <string> |
@@ -920,10 +920,30 @@ parse_decls()
 		}
 		parse(S_authentication);
 		parse(S_separator);
+#if HAVE_PAM
+		if (sym_code == S_pam) {
+		    parse(S_pam);
+		    authen_default = tac_strdup(sym_buf);
+		    default_authen_type = TAC_PLUS_DEFAULT_AUTHEN_TYPE_PAM;
+		    continue;
+		} else if (sym_code == S_file) {
+		    parse(S_file);
+		    authen_default = tac_strdup(sym_buf);
+		    default_authen_type = TAC_PLUS_DEFAULT_AUTHEN_TYPE_FILE;
+		    sym_get();
+		    continue;
+		} else {
+		    parse_error("not support value defined authentication default on "
+		                "line %d", sym_line);
+		    return(1);
+		}
+#else
 		parse(S_file);
 		authen_default = tac_strdup(sym_buf);
+		default_authen_type = TAC_PLUS_DEFAULT_AUTHEN_TYPE_FILE;
 		sym_get();
 		continue;
+#endif
 	    }
 
 	case S_key:
@@ -1872,7 +1892,7 @@ get_value(USER *user, int field)
     case S_nopasswd:
 	v.intval = user->nopasswd;
 	break;
-	
+
     default:
 	report(LOG_ERR, "get_value: unknown field %d", field);
 	break;
@@ -2052,7 +2072,7 @@ cfg_get_value(char *name, int isuser, int attr, int recurse)
 	   report(LOG_DEBUG, "cfg_get_value for %s found member attribute group=%s", name, group->name);
     } else
 	group = NULL;
-    
+
     while (group) {
 	if (debug & DEBUG_CONFIG_FLAG)
 	    report(LOG_DEBUG, "cfg_get_value: recurse group = %s", group->name);

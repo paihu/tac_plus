@@ -143,10 +143,26 @@ verify(char *name, char *passwd, struct authen_data *data, int recurse)
      * has been issued, attempt to use this password file
      */
     if (cfg_passwd == NULL) {
-	char *file = cfg_get_authen_default();
-	if (file) {
-	    return(passwd_file_verify(name, passwd, data, file));
-	}
+        if (default_authen_type == TAC_PLUS_DEFAULT_AUTHEN_TYPE_FILE) {
+	    char *file = cfg_get_authen_default();
+	    report(LOG_DEBUG, "verify user: %s pwfile: %s",name,file);
+	    if (file) {
+	        return(passwd_file_verify(name, passwd, data, file));
+	    }
+#if HAVE_PAM
+        } else if (default_authen_type == TAC_PLUS_DEFAULT_AUTHEN_TYPE_PAM) {
+	    /* try to verify the password via PAM */
+	    if (!pam_verify(name, passwd)) {
+	       data->status = TAC_PLUS_AUTHEN_STATUS_FAIL;
+	       return(0);
+	    } else
+               data->status = TAC_PLUS_AUTHEN_STATUS_PASS;
+
+	    exp_date = cfg_get_expires(name, recurse);
+	    set_expiration_status(exp_date, data);
+	    return(data->status == TAC_PLUS_AUTHEN_STATUS_PASS);
+#endif        
+        }
 
 	/* otherwise, we fail */
 	data->status = TAC_PLUS_AUTHEN_STATUS_FAIL;
@@ -411,7 +427,7 @@ passwd_file_verify(char *user, char *supplied_passwd, struct authen_data *data,
     char *cfg_passwd;
 
     data->status = TAC_PLUS_AUTHEN_STATUS_FAIL;
-
+    
     if (filename && STREQ(filename, "/etc/passwd")) {
 	return(etc_passwd_file_verify(user, supplied_passwd, data));
     }
@@ -521,7 +537,7 @@ pam_tacacs(int nmsg, const struct pam_message **pmpp, struct pam_response
 	    /* pre-supplied password, such as service=PAP, or prompt for it */
 	    if (passwd != NULL && strlen(passwd) > 0) {
 		prpp[i]->resp = tac_strdup(passwd);
-	    } else {
+	    } else {	        
 		send_authen_reply(TAC_PLUS_AUTHEN_STATUS_GETPASS,
 				  (char *)pmpp[i]->msg,
 				  pmpp[i]->msg ? strlen(pmpp[i]->msg) : 0,
@@ -544,7 +560,6 @@ pam_tacacs(int nmsg, const struct pam_message **pmpp, struct pam_response
 		prpp[i]->resp = (char *)tac_malloc(acp->user_msg_len + 1);
 		memcpy(prpp[i]->resp, rp, acp->user_msg_len);
 		prpp[i]->resp[acp->user_msg_len] = '\0';
-
 		free(reply);
 	    }
 	    break;
@@ -622,9 +637,6 @@ pam_verify(char *user, char *passwd)
     int			pam_flag;
     struct pam_conv	conv = { pam_tacacs, passwd };
     pam_handle_t	*pamh = NULL;
-
-    if (debug & DEBUG_PASSWD_FLAG)
-	report(LOG_DEBUG, "pam_verify %s %s", user, passwd);
 
     if (user == NULL /* XXX || passwd == NULL || *passwd == '\0'*/) {
 	if (debug & DEBUG_PASSWD_FLAG)

@@ -100,5 +100,4 @@
 #define S_group_basedn	56
 #define S_filter	57
 #define S_attributes	58
-
 #endif

@@ -70,7 +70,6 @@ parser_init(void)
     declare("arap", S_arap);
     declare("attribute", S_attr);
     declare("authentication", S_authentication);
-
     declare("authorization", S_authorization);
     declare("before", S_before);
     declare("chap", S_chap);

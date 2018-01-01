@@ -277,7 +277,7 @@ main(int argc, char **argv)
     struct pollfd *pfds;
 
 #ifndef SOMAXCONN
-# define SOMAXCONN 512
+# define SOMAXCONN 64
 #endif
     somaxconn = SOMAXCONN;
 
@@ -615,9 +615,6 @@ main(int argc, char **argv)
 	pfds[c].events = POLLIN | POLLERR | POLLHUP | POLLNVAL;
     }
 
-    
-
-
     for (;;) {
 #if HAVE_PID_T
 	pid_t pid;
@@ -721,9 +718,8 @@ main(int argc, char **argv)
 	    start_session();
 	    shutdown(session.sock, 2);
 	    close(session.sock);
-	    if (!single) {
+	    if (!single)
 		tac_exit(0);
-            }
 	} else {
 	    if (debug & DEBUG_FORK_FLAG)
 		report(LOG_DEBUG, "forked %ld", (long)pid);
