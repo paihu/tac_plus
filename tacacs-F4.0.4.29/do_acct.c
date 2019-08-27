@@ -74,7 +74,7 @@ do_acct_file(struct acct_rec *rec)
     struct tm *tm;
 
     tm = localtime(&t);
-    strftime(ct, LINE_MAX, "%h %e %T", tm);
+    strftime(ct, LINE_MAX, "%F %T", tm);
 
     if (!acctfd) {
 	acctfd = open(session.acctfile, O_CREAT | O_WRONLY | O_APPEND, 0644);
