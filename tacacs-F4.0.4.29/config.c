@@ -1305,6 +1305,12 @@ parse_user(void)
 		break;
 #endif
 
+#ifdef HAVE_LDAP
+	    case S_ldap:
+		user->pap = tac_strdup(sym_buf);
+		break;
+#endif
+
 	    case S_file:
 	    case S_cleartext:
 	    case S_des:

@@ -416,6 +416,7 @@ and user default:
 .nf
 user = DEFAULT {
         login = ldap
+        pap = ldap
 }
 .fi
 .sp
