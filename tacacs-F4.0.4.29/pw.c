@@ -47,14 +47,14 @@ tac_passwd_lookup(char *name, char *file)
 
     if (passwd_fp) {
 	if (debug & DEBUG_PASSWD_FLAG)
-	    report(LOG_DEBUG, "tac_passwd_lookup: open %s %d",
-		   file, fileno(passwd_fp));
+	    report(LOG_DEBUG, "tac_passwd_lookup user: %s open %s %d",
+		   name, file, fileno(passwd_fp));
     } else {
 	report(LOG_ERR, "tac_passwd_lookup: cannot open file %s for reading",
 	       file);
 	return(NULL);
     }
-
+    
     while (fgets(buf, sizeof(buf), passwd_fp)) {
 
 	/* uname, password, uid, gid, gecos, homedir, shell */
@@ -95,6 +95,7 @@ tac_passwd_lookup(char *name, char *file)
 	if (!e) {
 	    break;
 	}
+	
 	strncpy(gecos, s, e - s);
 	gecos[e - s] = '\0';
 
@@ -125,16 +126,16 @@ tac_passwd_lookup(char *name, char *file)
 	pw_passwd.pw_shell   = shell;
 
 	if (debug & DEBUG_PASSWD_FLAG)
-	    report(LOG_DEBUG, "tac_passwd_lookup: close %s %d",
-		   file, fileno(passwd_fp));
+	    report(LOG_DEBUG, "tac_passwd_lookup: close %s %d user: %s found",
+		   file, fileno(passwd_fp),name);
 	fclose(passwd_fp);
 	return(&pw_passwd);
     }
 
     /* no match found */
     if (debug & DEBUG_PASSWD_FLAG)
-	    report(LOG_DEBUG, "tac_passwd_lookup: close %s %d",
-		   file, fileno(passwd_fp));
+	    report(LOG_DEBUG, "tac_passwd_lookup: close %s %d user: %s not found",
+		   file, fileno(passwd_fp),name);
     fclose(passwd_fp);
 
     return(NULL);

@@ -91,3 +91,13 @@
 #endif
 #define	S_syslog	50
 #define S_aceclnt	51
+
+#ifdef HAVE_LDAP
+#define S_ldap		52
+#define S_url		53
+#define S_password	54
+#define S_user_basedn	55
+#define S_group_basedn	56
+#define S_filter	57
+#define S_attributes	58
+#endif

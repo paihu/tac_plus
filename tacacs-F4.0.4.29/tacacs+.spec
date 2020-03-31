@@ -11,7 +11,7 @@ Vendor: Cisco
 Source: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
-BuildRequires: gcc, bison, flex, m4, pam-devel, tcp_wrappers, tcp_wrappers-devel
+BuildRequires: gcc, bison, flex, m4, pam-devel, ldap, tcp_wrappers, tcp_wrappers-devel
 Requires: pam, tcp_wrappers
 
 %description

@@ -389,6 +389,8 @@ main(int argc, char **argv)
     if (debug)
 	report(LOG_DEBUG, "tac_plus server %s starting", version);
 
+
+
     if (!standalone) {
 	/* running under inetd */
 	char host[NI_MAXHOST];
@@ -713,7 +715,6 @@ main(int argc, char **argv)
 #if PROFILE
 	    moncontrol(1);
 #endif
-
 	    start_session();
 	    shutdown(session.sock, 2);
 	    close(session.sock);
@@ -772,6 +773,7 @@ start_session(void)
 {
     u_char *pak;
     HDR *hdr;
+
 
     do {
 	session.seq_no = 0;
@@ -998,6 +1000,8 @@ vers(void)
 #if __STDC__
     fprintf(stdout, "__STDC__\n");
 #endif
-
+#ifdef HAVE_LDAP
+    fprintf(stdout, "LDAP\n");
+#endif
     return;
 }

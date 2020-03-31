@@ -433,6 +433,37 @@ validate from the /etc/master.passwd or /etc/shadow file. The symptom will
 be that for each authentiction that is attempted, the password will appear
 to be wrong whether it was typed correctly or not.
 
+5). Authentication using LDAP
+
+You can use ldap for user authentication and user group member specification.
+In configuration you have to specify ldap connection attributes:
+ldap url = "ldap://127.0.0.1"
+ldap user = "cn=Manager,dc=domain,dc=com"
+ldap password = secret
+ldap user_basedn = "ou=users,dc=domain,dc=com"
+ldap group_basedn = "ou=tacacs,ou=groups,dc=domain,dc=com"
+
+and user default:
+user = DEFAULT {
+        login = ldap
+}
+
+or in group configuration:
+group = admin {
+        login = ldap
+}
+
+In ldap server should be standard posix users/groups with attribute
+userPassword/memberUid
+
+group record:
+dn: cn=admin1,ou=tacacs,ou=groups,dc=domain,dc=com
+objectClass: posixGroup
+objectClass: top
+cn: admin1
+gidNumber: 1234
+memberUid: login
+
 
 RECURSIVE PASSWORD LOOKUPS
 ---------------------------

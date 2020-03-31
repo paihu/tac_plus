@@ -66,6 +66,9 @@
 /* define if your system has libpam */
 #undef HAVE_PAM
 
+/* define if your system has libldap */
+#undef HAVE_LDAP
+
 /* Define to 1 if the system has the type `pid_t'. */
 #undef HAVE_PID_T
 

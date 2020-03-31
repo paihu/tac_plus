@@ -1,5 +1,5 @@
 /*
- * $Id: tac_plus.h,v 1.55 2009/07/17 16:10:52 heas Exp $
+ * $Id: tacacs.h,v 1.1 2009-07-17 16:10:52 heas Exp $
  *
  * Copyright (c) 1995-1998 by Cisco systems, Inc.
  *
@@ -17,80 +17,207 @@
  * IS'' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING,
  * WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
  * FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * TACACS/libtacacs
  */
 
-#include "config.h"
+#ifndef TACACS_H
+#define TACACS_H	1
 
-/* use strerror() if we have one, else sys_errlist[errno] */
-#ifndef HAVE_STRERROR
-# define strerror(a)	sys_errlist[a]
+#ifndef TAC_PLUS_PORT
+#define	TAC_PLUS_PORT			49
+#define	TAC_PLUS_PORTSTR		"49"
 #endif
 
+#define TAC_PLUS_READ_TIMEOUT		180	/* seconds */
+#define TAC_PLUS_WRITE_TIMEOUT		180	/* seconds */
+#define TAC_PLUS_ACCEPT_TIMEOUT		15	/* seconds */
+
+/*
+ * All tacacs+ packets have the same header format
+ *
+ *  1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8  1 2 3 4 5 6 7 8
+ * +----------------+----------------+----------------+----------------+
+ * |major  | minor  |                |                |                |
+ * |version| version|      type      |     seq_no     |   flags        |
+ * +----------------+----------------+----------------+----------------+
+ * |                                                                   |
+ * |                            session_id                             |
+ * +----------------+----------------+----------------+----------------+
+ * |                                                                   |
+ * |                              length                               |
+ * +----------------+----------------+----------------+----------------+
+ */
+struct tac_plus_pak_hdr {
+    u_char version;
+#define TAC_PLUS_MAJOR_VER_MASK 0xf0
+#define TAC_PLUS_MAJOR_VER      0xc0
+
+#define TAC_PLUS_MINOR_VER_0    0x0
+#define TAC_PLUS_VER_0  (TAC_PLUS_MAJOR_VER | TAC_PLUS_MINOR_VER_0)
+
+#define TAC_PLUS_MINOR_VER_1    0x01
+#define TAC_PLUS_VER_1  (TAC_PLUS_MAJOR_VER | TAC_PLUS_MINOR_VER_1)
+
+    u_char type;
+#define TAC_PLUS_AUTHEN			1
+#define TAC_PLUS_AUTHOR			2
+#define TAC_PLUS_ACCT			3
+
+    u_char seq_no;		/* packet sequence number */
+    u_char flags;		/* protocol flags, as below */
+#define	TAC_PLUS_UNENCRYPTED	0x1		/* packet is NOT encrypted   */
+#define	TAC_PLUS_SINGLE_CONNECT_FLAG 0x04
+
+    int session_id;		/* session identifier */
+    int datalength;		/* length of encrypted data following this
+				 * header */
+    /* data bytes of encrypted data follows */
+};
+
+#define TAC_PLUS_HDR_SIZE	12
+
+#define TAC_MD5_DIGEST_LEN	16
+
+/* accounting record structure */
+struct acct_rec {
+    int acct_type;		/* start, stop, update */
+#define ACCT_TYPE_START      1
+#define ACCT_TYPE_STOP       2
+#define ACCT_TYPE_UPDATE     3
+    struct identity *identity;
+    int authen_method;
+    int authen_type;
+    int authen_service;
+    char *msg;       /* output field */
+    char *admin_msg; /* output field */
+    int num_args;
+    char **args;
+};
+
+/* Authentication packet NAS sends to us */
+struct authen_start {
+    u_char action;
+#define TAC_PLUS_AUTHEN_LOGIN    0x1
+#define TAC_PLUS_AUTHEN_CHPASS   0x2
+#define TAC_PLUS_AUTHEN_SENDPASS 0x3 /* deprecated */
+#define TAC_PLUS_AUTHEN_SENDAUTH 0x4
+    u_char priv_lvl;
+#define TAC_PLUS_PRIV_LVL_MIN 0x0
+#define TAC_PLUS_PRIV_LVL_MAX 0xf
+    u_char authen_type;
+#define TAC_PLUS_AUTHEN_TYPE_ASCII  1
+#define TAC_PLUS_AUTHEN_TYPE_PAP    2
+#define TAC_PLUS_AUTHEN_TYPE_CHAP   3
+#define TAC_PLUS_AUTHEN_TYPE_ARAP   4
+#ifdef MSCHAP
+#define TAC_PLUS_AUTHEN_TYPE_MSCHAP 5
+#endif /* MSCHAP */
+    u_char service;
+#define TAC_PLUS_AUTHEN_SVC_LOGIN  1
+#define TAC_PLUS_AUTHEN_SVC_ENABLE 2
+#define TAC_PLUS_AUTHEN_SVC_PPP    3
+#define TAC_PLUS_AUTHEN_SVC_ARAP   4
+#define TAC_PLUS_AUTHEN_SVC_PT     5
+#define TAC_PLUS_AUTHEN_SVC_RCMD   6
+#define TAC_PLUS_AUTHEN_SVC_X25    7
+#define TAC_PLUS_AUTHEN_SVC_NASI   8
+    u_char user_len;				/* bytes of char data */
+    u_char port_len;				/* bytes of char data */
+    u_char rem_addr_len;			/* bytes of u_char data */
+    u_char data_len;				/* bytes of u_char data */
+};
+
+#define TAC_AUTHEN_START_FIXED_FIELDS_SIZE 8
+
+/* Authentication continue packet NAS sends to us */
+struct authen_cont {
+    u_short user_msg_len;
+    u_short user_data_len;
+    u_char flags;
+#define TAC_PLUS_CONTINUE_FLAG_ABORT 0x1
+    /* <user_msg_len bytes of u_char data> */
+    /* <user_data_len bytes of u_char data> */
+};
+
+#define TAC_AUTHEN_CONT_FIXED_FIELDS_SIZE 5
+
+/* Authentication reply packet we send to NAS */
+struct authen_reply {
+    u_char status;
+#define TAC_PLUS_AUTHEN_STATUS_PASS     1
+#define TAC_PLUS_AUTHEN_STATUS_FAIL     2
+#define TAC_PLUS_AUTHEN_STATUS_GETDATA  3
+#define TAC_PLUS_AUTHEN_STATUS_GETUSER  4
+#define TAC_PLUS_AUTHEN_STATUS_GETPASS  5
+#define TAC_PLUS_AUTHEN_STATUS_RESTART  6
+#define TAC_PLUS_AUTHEN_STATUS_ERROR    7
+#define TAC_PLUS_AUTHEN_STATUS_FOLLOW   0x21
+    u_char flags;
+#define TAC_PLUS_AUTHEN_FLAG_NOECHO     0x1
+    u_short msg_len;
+    u_short data_len;
+    /* <msg_len bytes of char data> */
+    /* <data_len bytes of u_char data> */
+};
+
+#define TAC_AUTHEN_REPLY_FIXED_FIELDS_SIZE 6
+
+/* An authorization request packet */
+struct author {
+    u_char authen_method;
+    u_char priv_lvl;
+    u_char authen_type;
+    u_char service;
+
+    u_char user_len;				/* bytes of char data */
+    u_char port_len;				/* bytes of char data */
+    u_char rem_addr_len;			/* bytes of u_char data */
+    u_char arg_cnt;				/* the number of args */
+
+    /* <arg_cnt u_chars containing the lengths of args 1 to arg n> */
+    /* <char data for each arg> */
+};
+
+#define TAC_AUTHOR_REQ_FIXED_FIELDS_SIZE 8
+
+/* An authorization reply packet */
+struct author_reply {
+    u_char status;
+    u_char arg_cnt;
+    u_short msg_len;
+    u_short data_len;
+
+    /* <arg_cnt u_chars containing the lengths of arg 1 to arg n> */
+    /* <msg_len bytes of char data> */
+    /* <data_len bytes of char data> */
+    /* <char data for each arg> */
+};
+
+#define TAC_AUTHOR_REPLY_FIXED_FIELDS_SIZE 6
+
+/* This structure describes a principal that is to be authenticated. */
+struct identity {
+    char *username;		/* principals name (ASCII, null terminated) */
+    char *NAS_name;		/* name of the NAS where the user is */
+    char *NAS_port;		/* port on the NAS where the user is */
+    char *NAS_ip;		/* IP address of the NAS */
+    char *NAC_address;		/* remote user location. This may be a remote
+				 * IP address or a caller-ID or ...
+				 */
+    int priv_lvl;		/* user's requested privilege level */
+};
+
+#if XXX
+XXX unknown
 #ifdef MSCHAP
 #define MSCHAP_DIGEST_LEN 49
 #endif /* MSCHAP */
 
-#if HAVE_STRING_H
-# include <string.h>
-#endif
-#if HAVE_SYS_TYPES_H
-# include <sys/types.h>
-#endif
-#include <errno.h>
-#include <netdb.h>
-#include <pwd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <stdio.h>
-#include <sys/ioctl.h>
-#include <sys/stat.h>
-#include <sys/file.h>
-#if TIME_WITH_SYS_TIME
-# include <sys/time.h>
-# include <time.h>
-#else
-# if HAVE_SYS_TIME_H
-#  include <sys/time.h>
-# else
-#  include <time.h>
-# endif
-#endif
+#include <utmp.h>
 
-#if HAVE_MALLOC_H
-# include <malloc.h>
-#endif
-
-#if HAVE_STDLIB_H
-# include <stdlib.h>
-#endif
-
-#if HAVE_SYSLOG_H
-# include <syslog.h>
-#else
-# include <sys/syslog.h>
-#endif
-
-#if HAVE_UTMP_H
-# include <utmp.h>
-#elif HAVE_UTMPX_H
-# include <utmpx.h>
-#endif
-
-#include <unistd.h>
-
-#if HAVE_STRINGS_H
-# include <strings.h>
-#endif
-#if HAVE_FCNTL_H
-# include <fcntl.h>
-#endif
-
-#include "tacacs.h"
-#include "pathsl.h"
+XXX should this be in tacacs.h?
 #include "md5.h"
-
-typedef struct tac_plus_pak_hdr HDR;
 
 /*
  * You probably shouldn't be changing much below this line unless you really
@@ -163,7 +290,6 @@ struct author_data {
 #define AUTHEN_METH_LOCAL            0x05
 #define AUTHEN_METH_TACACSPLUS       0x06
 #define AUTHEN_METH_RCMD             0x20
-
     int authen_type;		/* authentication type see authen_type */
     int service;		/* calling service */
     char *msg;		        /* optional NULL-terminated return message */
@@ -190,8 +316,6 @@ struct session {
     int sock;                      /* socket for this connection */
     int flags;
 #define SESS_FLAG_ACCTSYSL	0x1		/* syslog accounting records */
-#define SESS_NO_SINGLECONN	0x2		/* single-connect not allowed*/
-    int peerflags;		   /* header flags from client */
     char *key;                     /* the key */
     int keyline;                   /* line number key was found on */
     char *peer;                    /* name of connected peer */
@@ -200,6 +324,17 @@ struct session {
     char *acctfile;                /* name of accounting file */
     char port[NAS_PORT_MAX_LEN+1]; /* For error reporting */
     u_char version;                /* version of last packet read */
+#ifdef HAVE_LDAP
+    LDAP *ldap;			   /* ldap base structure */
+    int  use_ldap;		   /* status flag 0 - do not use, 1 - bind successful */
+    char *ldap_url;                /* ldap server connection url */
+    char *ldap_user_dn;		   /* ldap username */
+    char *ldap_password;	   /* ldap password */
+    char *ldap_user_base_dn;       /* ldap server user base dn */
+    char *ldap_group_base_dn;      /* ldap server group base dn */
+    char *ldap_filter;             /* ldap server search filter */
+    char *ldap_attributes;         /* ldap server search attributes */    
+#endif
 };
 
 extern struct session session;     /* the session */
@@ -216,13 +351,6 @@ extern int single;                 /* do not fork (for debugging) */
 extern struct timeval started_at;
 extern char *wtmpfile;
 extern int wtmpfd;
-
-/* extend default authentication */
-int default_authen_type;
-#define TAC_PLUS_DEFAULT_AUTHEN_TYPE_FILE  1
-#if HAVE_PAM
-#define TAC_PLUS_DEFAULT_AUTHEN_TYPE_PAM   2
-#endif
 
 #define HASH_TAB_SIZE 157        /* user and group hash table sizes */
 
@@ -265,35 +393,9 @@ struct acct_reply {
 #define STREQ(a,b) (strcmp(a,b)==0)
 #define MAX_INPUT_LINE_LEN 255
 
-/* Debugging flags */
-
-#define DEBUG_PARSE_FLAG     2
-#define DEBUG_FORK_FLAG      4
-#define DEBUG_AUTHOR_FLAG    8
-#define DEBUG_AUTHEN_FLAG    16
-#define DEBUG_PASSWD_FLAG    32
-#define DEBUG_ACCT_FLAG      64
-#define DEBUG_CONFIG_FLAG    128
-#define DEBUG_PACKET_FLAG    256
-#define DEBUG_HEX_FLAG       512
-#define DEBUG_MD5_HASH_FLAG  1024
-#define DEBUG_XOR_FLAG       2048
-#define DEBUG_CLEAN_FLAG     4096
-#define DEBUG_SUBST_FLAG     8192
-#define DEBUG_PROXY_FLAG     16384
-#define DEBUG_MAXSESS_FLAG   32768
-#define DEBUG_LOCK_FLAG      65536
-
-#define TAC_IS_USER           1
-#define TAC_PLUS_RECURSE      1
-#define TAC_PLUS_NORECURSE    0
-
 #define DEFAULT_USERNAME "DEFAULT"
 
-#include "parse.h"
-
 /* Node types */
-
 #define N_arg           50
 #define N_optarg        51
 #define N_svc_exec      52
@@ -306,54 +408,42 @@ struct acct_reply {
 #define N_svc           59
 
 /* A parse tree node */
-typedef struct node {
+struct node {
     int type;     /* node type (arg, svc, proto) */
     void *next;   /* pointer to next node in chain */
     void *value;  /* node value */
     void *value1; /* node value */
     int dflt;     /* default value for node */
     int line;     /* line number declared on */
-} NODE;
+};
+typedef struct node NODE;
 
-typedef union v {
+union v {
     int intval;
     void *pval;
-} VALUE;
+};
+typedef union v VALUE;
 
 /* acct.c */
-void accounting(u_char *);
+extern void accounting(u_char *);
 
 /* authen.c */
-void authen(u_char *);
+extern void authen(u_char *);
 
 /* author.c */
-void author(u_char *);
+extern void author(u_char *);
 
 /* choose_authen.c */
 int choose_authen(struct authen_data *, struct authen_type *);
 
 /* report.c */
-void report_string(int, u_char *, int);
-void report_hex(int, u_char *, int);
+extern void report_string(int, u_char *, int);
+extern void report_hex(int, u_char *, int);
 #ifdef __STDC__
-void report(int priority, char *fmt, ...);
+extern void report(int priority, char *fmt, ...);
 #else
-void report();
+extern void report();
 #endif
-
-/* utils.c */
-RETSIGTYPE tac_exit(int);
-int tac_lockfd(char *, int);
-char *tac_malloc(int);
-char *tac_strdup(char *);
-char *tac_make_string(u_char *, int);
-char *tac_find_substring(char *, char *);
-char *tac_realloc(char *, int);
-
-/* do_acct.c */
-int do_acct_file(struct acct_rec *);
-int do_acct_syslog(struct acct_rec *);
-int do_wtmp(struct acct_rec *);
 
 /* do_author.c */
 int do_author(struct author_data *);
@@ -370,45 +460,6 @@ struct entry;
 void *hash_add_entry(void **, struct entry *);
 void **hash_get_entries(void **);
 void *hash_lookup(void **, char *);
-
-/* config.c */
-#ifdef ACLS
-int	cfg_acl_check(char *, char *);
-#endif
-void	cfg_clean_config(void);
-char	*cfg_get_arap_secret(char *, int);
-char	*cfg_get_authen_default(void);
-char	*cfg_get_chap_secret(char *, int);
-NODE	*cfg_get_cmd_node(char *, char *, int);
-#ifdef UENABLE
-char	*cfg_get_enable_secret(char *, int);
-int	cfg_get_user_noenablepwd(char *, int);
-#endif
-char	*cfg_get_expires(char *, int);
-int	cfg_get_intvalue(char *, int, int, int);
-char	*cfg_get_phvalue(char *, int);
-char	*cfg_get_pvalue(char *, int, int, int);
-char	*cfg_get_global_secret(char *, int);
-char	*cfg_get_host_enable(char *);
-char	*cfg_get_host_key(char *);
-#ifdef UENABLE
-int	cfg_get_host_noenablepwd(char *);
-#endif
-char	*cfg_get_host_prompt(char *);
-char	*cfg_get_login_secret(char *, int);
-#ifdef MSCHAP
-char	*cfg_get_mschap_secret(char *, int);
-#endif
-char	*cfg_get_opap_secret(char *, int);
-char	*cfg_get_pap_secret(char *, int);
-char	**cfg_get_svc_attrs(NODE *, int *);
-NODE	*cfg_get_svc_node(char *, int, char *, char *, int);
-int	cfg_get_user_nopasswd(char *, int);
-char	*cfg_nodestring(int);
-int	cfg_ppp_is_configured(char *, int);
-int	cfg_read_config(char *);
-int	cfg_user_exists(char *);
-int	cfg_user_svc_default_is_permit(char *);
 
 /* default_fn.c */
 int	default_fn(struct authen_data *);
@@ -435,18 +486,8 @@ void	send_author_reply(u_char, char *, char *, int, char **);
 void	send_error_reply(int, char *);
 u_char *read_packet(void);
 
-/* parse.c */
-char	*codestring(int);
-int	keycode(char *);
-void	parser_init(void);
-
-/* programs.c */
-int call_pre_process(char *, struct author_data *, char ***, int *, char *,
-		     int);
-int call_post_process(char *, struct author_data *, char ***, int *);
-
 /* pw.c */
-struct passwd *tac_passwd_lookup(char *, char *);
+extern struct passwd *tac_passwd_lookup(char *, char *);
 
 /* pwlib.c */
 void	set_expiration_status(char *, struct authen_data *);
@@ -463,4 +504,24 @@ int skey_fn(struct authen_data *data);
 /* tac_plus.c */
 void open_logfile(void);
 
-int maxsess_check_count(char *, struct author_data *);
+#endif /* XXX if 0 */
+
+int countusers_by_finger(struct identity *);
+int countuser(struct identity *);
+void loguser(struct acct_rec *);
+void maxsess_loginit(void);
+
+/* XXX add a function to set this in the library */
+extern char *wholog;
+
+/*
+ * This is state kept per user/session for maxsess wholog file
+ */
+struct peruser {
+    char username[64];		/* User name */
+    char NAS_name[32];		/* NAS user logged into */
+    char NAS_port[32];		/*  ...port on that NAS */
+    char NAC_address[64];	/*  ...IP address of NAS */
+};
+
+#endif	/* TACACS_H */
